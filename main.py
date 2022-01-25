@@ -3,35 +3,57 @@ import socket
 import time
 import json
 
+def send_to_cle(data2send, s):
+    data2send = json.dumps(data2send).encode()
+    s.sendall(len(data2send).to_bytes(4, "little"))
+    s.sendall(data2send)
 
-def consume():
+
+def receive_from_cle(s):
+    rcv_size = int.from_bytes(s.recv(4), 'little')
+    msg = json.loads(s.recv(rcv_size).decode())
+    return msg
+
+
+def consume(in_put):
     while True:
-        print("1")
-        time.sleep(5)
-
-def produce():
-    while True:
-        print("2")
-        time.sleep(1)
+        data = receive_from_cle(in_put)
+        print(data)
 
 
+def produce(out_put, room_config, msgs):
+    # command = input("Input: ")
+    # if command == "sc":
+    #     send_to_cle(room_config, out_put)
+    # elif command == "start":
+    #     for msg in msgs:
+    #         send_to_cle(msg, out_put)
+    # else:
+    #     print("Unknown command")
+    print(room_config)
+    send_to_cle(room_config, out_put)
+    for msg in msgs:
+        send_to_cle(msg, out_put)
 
 if __name__ == "__main__":
 
+    COMPANY = "MPEI"
+    ROOM = "Z408"
+
     ip = '192.168.1.37'
     port = 5050
-    # output_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # output_socket.bind((ip, port))
-    # output_socket.listen()
-    #
-    # input_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # input_socket.bind((ip, port+1))
-    # input_socket.listen()
+    output_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    output_socket.bind((ip, port))
+    output_socket.listen()
+
+    input_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    input_socket.bind((ip, port+1))
+    input_socket.listen()
 
     print("[SERVER STARTED]")
 
-    # input, addr = input_socket.accept()
-    # output, addr = output_socket.accept()
+    in_put, addr = input_socket.accept()
+    out_put, addr = output_socket.accept()
 
     print("[CLE CONNECTED]")
 
@@ -40,10 +62,16 @@ if __name__ == "__main__":
         for line in file:
             anchors.append(json.loads(line))
 
-    for anchor in anchors:
-        print(anchor)
+    room_config = {}
+    room_config["type"] = "room_config"
+    room_config["company"] = COMPANY
+    room_config["room"] = ROOM
+    room_config["anchors"] = anchors
 
-    time.sleep(10)
+    # for anchor in anchors:
+    #     print(anchor)
+
+    # time.sleep(10)
 
     filename = 'logs/01072021105028peers.log'
     f = open(filename, 'r')
@@ -51,8 +79,8 @@ if __name__ == "__main__":
     for line in f:
         msg = {}
         a = line.split()
-        msg["company"] = "MPEI"
-        msg["room"] = "Z408"
+        msg["company"] = COMPANY
+        msg["room"] = ROOM
         msg["time"] = float(a[0])
 
         if a[1] == "CS_TX":
@@ -76,13 +104,13 @@ if __name__ == "__main__":
 
     print("File readed")
 
-    for msg in msgs:
-        print(msg)
+    # for msg in msgs:
+    #     print(msg)
 
 
-    pConsumer = Process(target=consume, args=[])
+    pConsumer = Process(target=consume, args=[in_put])
     pConsumer.start()
 
-    pProducer = Process(target=produce, args=[])
+    pProducer = Process(target=produce, args=[out_put, room_config, msgs])
     pProducer.start()
 
